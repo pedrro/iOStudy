@@ -32,9 +32,29 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         updateLabels()
     }
     
+    override func prepare(for segue: UIStoryboardSegue,
+                             sender: Any?) {
+        if segue.identifier == "TagLocation" {
+            let controller = segue.destination
+                as! LocationDetailsViewController
+            controller.coordinate = location!.coordinate
+            controller.placemark = placemark
+        }
+    }
+        
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.isNavigationBarHidden = true
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.isNavigationBarHidden = false
     }
     
     @IBAction func getLocation() {
@@ -80,85 +100,55 @@ class CurrentLocationViewController: UIViewController, CLLocationManagerDelegate
         
     }
     
-    func locationManager(_ manager: CLLocationManager,
-                         didUpdateLocations locations: [CLLocation]) {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         let newLocation = locations.last!
         print("didUpdateLocations \(newLocation)")
         
-        // 1
         if newLocation.timestamp.timeIntervalSinceNow < -5 {
             return
         }
-        
-        // 2
         if newLocation.horizontalAccuracy < 0 {
             return
         }
-        
-        var distance = CLLocationDistance(
-            Double.greatestFiniteMagnitude)
+        var distance = CLLocationDistance(Double.greatestFiniteMagnitude)
         if let location = location {
             distance = newLocation.distance(from: location)
         }
-        
-        // 3
-        if location == nil || location!.horizontalAccuracy >
-            newLocation.horizontalAccuracy {
-            
-            // 4
+        if location == nil || location!.horizontalAccuracy > newLocation.horizontalAccuracy {
             lastLocationError = nil
             location = newLocation
-            
-            // 5
-            if newLocation.horizontalAccuracy <=
-                locationManager.desiredAccuracy {
+            if newLocation.horizontalAccuracy <= locationManager.desiredAccuracy {
                 print("*** We're done!")
                 stopLocationManager()
-                
                 if distance > 0 {
                     performingReverseGeocoding = false
                 }
             }
-            
             updateLabels()
-            
             if !performingReverseGeocoding {
                 print("*** Going to geocode")
                 
                 performingReverseGeocoding = true
                 
-                geocoder.reverseGeocodeLocation(newLocation,
-                                                completionHandler: {
-                                                    placemarks, error in
-                                                    self.lastGeocodingError = error
-                                                    if error == nil, let p = placemarks, !p.isEmpty {
-                                                        self.placemark = p.last!
-                                                    } else {
-                                                        self.placemark = nil
-                                                    }
-                                                    
-                                                    
-                                                    
-                                                    if let error = error {
-                                                        print("*** Reverse Geocoding error: \(error.localizedDescription)")
-                                                        return
-                                                    }
-                                                    if let places = placemarks {
-                                                        print("*** Found places: \(places)")
-                                                    }
-                                                    
-                                                    self.performingReverseGeocoding = false
-                                                    self.updateLabels()
+                geocoder.reverseGeocodeLocation(newLocation, completionHandler: {
+                    placemarks, error in
+                    self.lastGeocodingError = error
+                    if error == nil, let p = placemarks, !p.isEmpty {
+                        self.placemark = p.last!
+                    } else {
+                        self.placemark = nil
+                    }
+                    
+                    self.performingReverseGeocoding = false
+                    self.updateLabels()
                 })
-            } else if distance < 1 {
-                let timeInterval = newLocation.timestamp.timeIntervalSince(
-                    location!.timestamp)
-                if timeInterval > 10 {
-                    print("*** Force done!")
-                    stopLocationManager()
-                    updateLabels()
-                }
-                // End of new sectiton #3
+            }
+        } else if distance < 1 {
+            let timeInterval = newLocation.timestamp.timeIntervalSince(location!.timestamp)
+            if timeInterval > 10 {
+                print("*** Force done!")
+                stopLocationManager()
+                updateLabels()
             }
         }
     }
